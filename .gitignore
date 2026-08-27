@@ -1,4 +1,5 @@
 .DS_Store
 .clasp.json
 .build/
+config_local.h
 hoja de sheet.textClipping

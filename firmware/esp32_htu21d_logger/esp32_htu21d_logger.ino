@@ -4,16 +4,21 @@
 #include "Adafruit_HTU21DF.h"
 
 // ==================== CONFIGURACIÓN POR MÓDULO ====================
-// Cambia estos valores por cada módulo que programes.
-const char* DEVICE_ID  = "D01";
-const char* WIFI_SSID  = "TU_RED_WIFI";
-const char* WIFI_PASS  = "TU_CONTRASENA";
-const char* SCRIPT_URL = "https://script.google.com/macros/s/AKfycbXXXXXXXXXXXXXXXXXXXXXXX/exec";
-const char* API_TOKEN  = "TOKEN_GENERADO_EN_APPS_SCRIPT";
+// Crea un archivo config_local.h en esta carpeta con tus valores reales.
+// Ese archivo NO se sube a GitHub (está en .gitignore).
+#if __has_include("config_local.h")
+  #include "config_local.h"
+#else
+  const char* DEVICE_ID  = "D01";
+  const char* WIFI_SSID  = "TU_RED_WIFI";
+  const char* WIFI_PASS  = "TU_CONTRASENA";
+  const char* SCRIPT_URL = "https://script.google.com/macros/s/AKfycbXXXXXXXXXXXXXXXXXXXXXXX/exec";
+  const char* API_TOKEN  = "TOKEN_GENERADO_EN_APPS_SCRIPT";
+#endif
 // ==================================================================
 
-#define PIN_SDA 22
-#define PIN_SCL 23
+#define PIN_SDA 22   // pad D4 en el XIAO ESP32-C6
+#define PIN_SCL 23   // pad D5 en el XIAO ESP32-C6
 
 const unsigned long SENSOR_PERIOD_MS = 2000;
 const unsigned long SEND_INTERVAL_MS = 60000;
@@ -22,6 +27,54 @@ const unsigned long MAX_OFFLINE_MS  = 900000;
 const int BUFFER_SIZE = 30;
 
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
+
+struct Par {
+  int sda;
+  int scl;
+  const char* nombre;
+};
+
+Par pares[] = {
+  {22, 23, "22/23 (C6: D4/D5)"},
+  {4, 5,   "4/5   (S3: D4/D5)"},
+  {8, 9,   "8/9   (S3: SDA/SCL)"},
+  {6, 7,   "6/7   (C3: D4/D5)"},
+  {21, 22, "21/22 (devboard clasico)"}
+};
+
+void escanearI2C() {
+  Serial.println("Dispositivos en el bus I2C por cada par de pines:");
+  for (int i = 0; i < 5; i++) {
+    Wire.end();
+    Wire.begin(pares[i].sda, pares[i].scl);
+    pinMode(pares[i].sda, INPUT_PULLUP);
+    pinMode(pares[i].scl, INPUT_PULLUP);
+    Serial.print("  SDA/SCL ");
+    Serial.print(pares[i].nombre);
+    Serial.print(": ");
+    int n = 0;
+    for (byte a = 1; a < 127; a++) {
+      Wire.beginTransmission(a);
+      if (Wire.endTransmission() == 0) {
+        Serial.print("0x");
+        if (a < 16) Serial.print("0");
+        Serial.print(a, HEX);
+        if (a == 0x40) Serial.print("(HTU21D)");
+        if (a == 0x38) Serial.print("(AHT20)");
+        if (a == 0x44) Serial.print("(SHT30)");
+        Serial.print(" ");
+        n++;
+      }
+    }
+    if (n == 0) Serial.print("nada");
+    Serial.println();
+    delay(200);
+  }
+  Wire.end();
+  Wire.begin(PIN_SDA, PIN_SCL);
+  Serial.println("Si aparece 0x40 en un par distinto a 22/23, usa esos numeros en PIN_SDA/PIN_SCL.");
+  Serial.println("Si no aparece nada: revisa VCC->3V3, GND y pull-ups de 4.7k.");
+}
 
 struct Lectura {
   float temp;
@@ -141,6 +194,7 @@ void setup() {
   Wire.begin(PIN_SDA, PIN_SCL);
   if (!htu.begin()) {
     Serial.println("ERROR: No se detecta el sensor HTU21D.");
+    escanearI2C();
     while (true) delay(1000);
   }
   Serial.println("HTU21D detectado.");

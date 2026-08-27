@@ -222,7 +222,7 @@
   </dialog>
 
   <script>
-    const API_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec';
+    const API_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbzz2GtMVbA9aKYM5dTthM9SKaLtpalfdCho-RkJ3CNedSPTJK5t96Iiovg5PBe8XeGd2A/exec';
     let chart = null;
     const cache = { dispositivos: [], areas: [] };
 
@@ -241,7 +241,8 @@
 
     function jsonp(accion, params, cb) {
       const cbName = 'jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-      const url = apiUrl() + '?route=api&accion=' + encodeURIComponent(accion) + '&callback=' + cbName + (params || '');
+      const buster = '&_t=' + Date.now();
+      const url = apiUrl() + '?route=api&accion=' + encodeURIComponent(accion) + '&callback=' + cbName + (params || '') + buster;
       let hecho = false;
       const script = document.createElement('script');
       const timeout = setTimeout(function () { limpiar(null); }, 15000);

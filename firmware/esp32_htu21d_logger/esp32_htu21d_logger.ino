@@ -4,17 +4,11 @@
 #include "Adafruit_HTU21DF.h"
 
 // ==================== CONFIGURACIÓN POR MÓDULO ====================
-// Crea un archivo config_local.h en esta carpeta con tus valores reales.
-// Ese archivo NO se sube a GitHub (está en .gitignore).
-#if __has_include("config_local.h")
-  #include "config_local.h"
-#else
-  const char* DEVICE_ID  = "D01";
-  const char* WIFI_SSID  = "TU_RED_WIFI";
-  const char* WIFI_PASS  = "TU_CONTRASENA";
-  const char* SCRIPT_URL = "https://script.google.com/macros/s/AKfycbXXXXXXXXXXXXXXXXXXXXXXX/exec";
-  const char* API_TOKEN  = "TOKEN_GENERADO_EN_APPS_SCRIPT";
-#endif
+const char* DEVICE_ID  = "QX1";
+const char* WIFI_SSID  = "HOSPITAL SAN DIEGO";
+const char* WIFI_PASS  = "SanDiego#23";
+const char* SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwCLYlBLa953tX1BhUVcqi49vX06riRtawxMGw2AXY7EkrWtT0VyW6oS7faQaPt6oLI/exec";
+const char* API_TOKEN  = "dbff22909f32453d8259c738e079ad1901638e2c48da480892d1bdf449912406";
 // ==================================================================
 
 #define PIN_SDA 22   // pad D4 en el XIAO ESP32-C6
@@ -27,6 +21,21 @@ const unsigned long MAX_OFFLINE_MS  = 900000;
 const int BUFFER_SIZE = 30;
 
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
+
+struct Lectura {
+  float temp;
+  float hum;
+};
+
+Lectura buffer[BUFFER_SIZE];
+int bufCount = 0;
+
+unsigned long lastRead = 0;
+unsigned long lastSend = 0;
+unsigned long lastWifiTry = 0;
+unsigned long offlineSince = 0;
+unsigned long sendInterval = SEND_INTERVAL_MS;
+unsigned long retryDelay = 10000;
 
 struct Par {
   int sda;
@@ -75,21 +84,6 @@ void escanearI2C() {
   Serial.println("Si aparece 0x40 en un par distinto a 22/23, usa esos numeros en PIN_SDA/PIN_SCL.");
   Serial.println("Si no aparece nada: revisa VCC->3V3, GND y pull-ups de 4.7k.");
 }
-
-struct Lectura {
-  float temp;
-  float hum;
-};
-
-Lectura buffer[BUFFER_SIZE];
-int bufCount = 0;
-
-unsigned long lastRead = 0;
-unsigned long lastSend = 0;
-unsigned long lastWifiTry = 0;
-unsigned long offlineSince = 0;
-unsigned long sendInterval = SEND_INTERVAL_MS;
-unsigned long retryDelay = 10000;
 
 void conectarWifi() {
   Serial.print("Conectando a WiFi ");

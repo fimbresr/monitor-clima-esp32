@@ -374,7 +374,6 @@ function getConfiguracion() {
   const key = 'EXECS_' + Utilities.formatDate(new Date(), CONFIG.TZ, 'yyyyMMdd');
   return {
     intervalo: intervaloConfigurado_(),
-    ejecucionesHoy: parseInt(props.getProperty(key) || '0', 10),
-    hayToken: Boolean(props.getProperty(CONFIG.TOKEN_PROP))
+    ejecucionesHoy: parseInt(props.getProperty(key) || '0', 10)
   };
 }

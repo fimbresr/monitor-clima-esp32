@@ -225,7 +225,6 @@
     const API_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec';
     let chart = null;
     const cache = { dispositivos: [], areas: [] };
-    let offline = false;
 
     function el(id) { return document.getElementById(id); }
     function apiUrl() { return localStorage.getItem('apiUrl') || API_URL_DEFAULT; }
@@ -245,7 +244,7 @@
       const url = apiUrl() + '?route=api&accion=' + encodeURIComponent(accion) + '&callback=' + cbName + (params || '');
       let hecho = false;
       const script = document.createElement('script');
-      const timeout = setTimeout(function () { limpiar(cb); }, 15000);
+      const timeout = setTimeout(function () { limpiar(null); }, 15000);
       function limpiar(resultado) {
         if (hecho) return;
         hecho = true;
@@ -303,7 +302,6 @@
     }
 
     function marcarOffline(activo) {
-      offline = activo;
       el('infoGral').innerHTML = 'Última actualización: ' + new Date().toLocaleTimeString('es-MX') +
         (activo ? '<span class="offline-badge">Sin conexión · mostrando últimos datos</span>' : '');
     }
@@ -554,7 +552,7 @@
     function guardarAjustes() {
       const url = el('cfgUrl').value.trim();
       const token = el('cfgToken').value.trim();
-      if (!url && !apiUrl()) {
+      if (!url && !localStorage.getItem('apiUrl')) {
         el('msgAjustes').textContent = 'Pega la URL /exec de tu Apps Script.';
         return;
       }

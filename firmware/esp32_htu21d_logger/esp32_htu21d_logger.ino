@@ -11,22 +11,18 @@ const char* SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwCLYlBLa953tX
 const char* API_TOKEN  = "dbff22909f32453d8259c738e079ad1901638e2c48da480892d1bdf449912406";
 // ==================================================================
 
-#define PIN_SDA 22   // pad D4 en el XIAO ESP32-C6
-#define PIN_SCL 23   // pad D5 en el XIAO ESP32-C6
+#define PIN_SDA 22
+#define PIN_SCL 23
 
 const unsigned long SENSOR_PERIOD_MS = 2000;
-const unsigned long SEND_INTERVAL_MS = 60000;
+const unsigned long SEND_INTERVAL_MS = 300000;   // 5 minutos
 const unsigned long WIFI_RETRY_MS   = 10000;
 const unsigned long MAX_OFFLINE_MS  = 900000;
 const int BUFFER_SIZE = 30;
 
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
 
-struct Lectura {
-  float temp;
-  float hum;
-};
-
+struct Lectura { float temp; float hum; };
 Lectura buffer[BUFFER_SIZE];
 int bufCount = 0;
 
@@ -37,12 +33,7 @@ unsigned long offlineSince = 0;
 unsigned long sendInterval = SEND_INTERVAL_MS;
 unsigned long retryDelay = 10000;
 
-struct Par {
-  int sda;
-  int scl;
-  const char* nombre;
-};
-
+struct Par { int sda; int scl; const char* nombre; };
 Par pares[] = {
   {22, 23, "22/23 (C6: D4/D5)"},
   {4, 5,   "4/5   (S3: D4/D5)"},

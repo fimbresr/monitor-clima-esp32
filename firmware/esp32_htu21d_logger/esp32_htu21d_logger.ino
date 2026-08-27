@@ -164,7 +164,8 @@ bool enviarLecturas(float temp, float hum) {
   Serial.print(" | ");
   Serial.println(respuesta);
 
-  if (codigo >= 200 && codigo < 400) {
+  bool exito = (codigo == 200 && respuesta.indexOf("\"ok\":true") >= 0) || (codigo >= 300 && codigo < 400);
+  if (exito) {
     long intervalo = extraerEntero(respuesta, "nextInterval");
     if (intervalo >= 30 && intervalo <= 600) {
       sendInterval = intervalo * 1000UL;

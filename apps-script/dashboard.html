@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Monitor de Clima</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0e1117;
+      --panel: #161b24;
+      --panel2: #1d2430;
+      --border: #2a3342;
+      --text: #e6edf3;
+      --muted: #8b98a9;
+      --accent: #4da3ff;
+      --temp: #ff9f43;
+      --hum: #4da3ff;
+      --ok: #3ddc84;
+      --warn: #ffd166;
+      --bad: #ff5c5c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 22px; font-weight: 600; }
+    .subtitulo { color: var(--muted); font-size: 13px; }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    select, button, input {
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    select:focus, button:focus, input:focus { outline: 2px solid var(--accent); }
+    button { cursor: pointer; background: var(--accent); color: #06121f; font-weight: 600; border: none; }
+    button.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--border); font-weight: 400; }
+    button.danger { background: var(--bad); color: #fff; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+    .card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+    .card .meta { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .panel h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .chart-wrap { position: relative; height: 380px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.ok { background: rgba(61, 220, 132, .15); color: var(--ok); }
+    .badge.warn { background: rgba(255, 209, 102, .15); color: var(--warn); }
+    .badge.bad { background: rgba(255, 92, 92, .15); color: var(--bad); }
+    details { margin-bottom: 20px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 600; margin-bottom: 12px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; max-width: 800px; }
+    .hidden { display: none; }
+    .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .empty { color: var(--muted); padding: 24px; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Monitor de Clima</h1>
+      <div class="subtitulo" id="infoGral">Cargando datos...</div>
+    </div>
+    <button class="ghost" id="btnRefresh">Actualizar</button>
+  </header>
+
+  <div class="toolbar">
+    <label>Área
+      <select id="selArea"><option value="">Todas</option></select>
+    </label>
+    <label>Dispositivo
+      <select id="selDevice"><option value="">Todos</option></select>
+    </label>
+    <label>Rango
+      <select id="selRango">
+        <option value="24">Últimas 24 horas</option>
+        <option value="168" selected>Últimos 7 días</option>
+        <option value="720">Últimos 30 días</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="panel">
+    <h2 id="tituloGrafica">Historial de lecturas</h2>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Estado actual de dispositivos</h2>
+    <div style="overflow-x:auto;">
+      <table id="tablaEstado">
+        <thead>
+          <tr><th>Dispositivo</th><th>Área</th><th>Temp</th><th>Hum</th><th>Última lectura</th><th>RSSI</th><th>Estado</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <details>
+    <summary>Administración de dispositivos</summary>
+    <div class="panel">
+      <h2>Dispositivos pendientes de registro</h2>
+      <div style="overflow-x:auto;">
+        <table id="tablaPendientes">
+          <thead>
+            <tr><th>DeviceID</th><th>Primera lectura</th><th>Última lectura</th><th>Veces visto</th><th>Acción</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Registrar dispositivo</h2>
+      <div class="form-grid">
+        <input id="inpId" placeholder="DeviceID (ej. D01)">
+        <input id="inpArea" placeholder="Área (ej. COCINA)">
+        <input id="inpNombre" placeholder="Nombre (ej. Sensor cocina)">
+        <input id="inpTipo" placeholder="Tipo (ej. HTU21D)">
+        <button id="btnRegistrar">Registrar</button>
+      </div>
+      <div class="note" id="msgRegistro"></div>
+    </div>
+    <div class="panel">
+      <h2>Dispositivos registrados</h2>
+      <div style="overflow-x:auto;">
+        <table id="tablaDispositivos">
+          <thead>
+            <tr><th>DeviceID</th><th>Área</th><th>Nombre</th><th>Activo</th><th>Acción</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+  <script>
+    let chart = null;
+    const cache = { dispositivos: [], areas: [] };
+
+    function el(id) { return document.getElementById(id); }
+
+    function esc(texto) {
+      return String(texto == null ? '' : texto)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function fmtFecha(iso, conFecha) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      if (!conFecha) return hh + ':' + mm;
+      return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + hh + ':' + mm;
+    }
+
+    function minDesde(iso) {
+      if (!iso) return null;
+      return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    }
+
+    function badgeEstatus(iso) {
+      const m = minDesde(iso);
+      if (m === null) return '<span class="badge bad">Sin datos</span>';
+      if (m < 10) return '<span class="badge ok">En línea</span>';
+      if (m < 30) return '<span class="badge warn">Hace ' + m + ' min</span>';
+      return '<span class="badge bad">Hace ' + m + ' min</span>';
+    }
+
+    function cargarFiltros() {
+      google.script.run.withSuccessHandler(function (areas) {
+        cache.areas = areas;
+        const sel = el('selArea');
+        const actual = sel.value;
+        sel.innerHTML = '<option value="">Todas</option>';
+        areas.forEach(function (a) {
+          sel.innerHTML += '<option value="' + esc(a) + '">' + esc(a) + '</option>';
+        });
+        sel.value = actual;
+      }).getAreas();
+
+      google.script.run.withSuccessHandler(function (disp) {
+        cache.dispositivos = disp;
+        poblarSelectDispositivos();
+      }).getDispositivos();
+    }
+
+    function poblarSelectDispositivos() {
+      const area = el('selArea').value;
+      const sel = el('selDevice');
+      const actual = sel.value;
+      sel.innerHTML = '<option value="">Todos</option>';
+      cache.dispositivos.forEach(function (d) {
+        if (area && d.area !== area) return;
+        sel.innerHTML += '<option value="' + esc(d.deviceId) + '">' + esc(d.nombre || d.deviceId) + ' (' + esc(d.deviceId) + ')</option>';
+      });
+      if (sel.querySelector('option[value="' + actual + '"]')) sel.value = actual;
+    }
+
+    function cargarEstado() {
+      google.script.run.withSuccessHandler(function (estado) {
+        renderTabla(estado);
+        renderCards(estado);
+      }).getUltimoEstado();
+    }
+
+    function renderCards(estado) {
+      const selDev = el('selDevice').value;
+      const selArea = el('selArea').value;
+      let objetivo = null;
+      if (selDev) {
+        objetivo = estado.find(function (s) { return s.deviceId === selDev; }) || null;
+      } else if (selArea) {
+        objetivo = estado.find(function (s) { return s.area === selArea; }) || null;
+      }
+      const cont = el('cards');
+      if (!objetivo) {
+        cont.innerHTML = '<div class="card"><div class="label">Selección</div><div class="value" style="font-size:18px;">Sin datos</div></div>';
+        return;
+      }
+      cont.innerHTML =
+        '<div class="card"><div class="label">Temperatura</div><div class="value" style="color:var(--temp)">' + (isFinite(objetivo.temp) ? objetivo.temp.toFixed(1) + ' °C' : '—') + '</div><div class="meta">' + esc(objetivo.deviceId) + '</div></div>' +
+        '<div class="card"><div class="label">Humedad</div><div class="value" style="color:var(--hum)">' + (isFinite(objetivo.hum) ? objetivo.hum.toFixed(1) + ' %' : '—') + '</div><div class="meta">Última: ' + fmtFecha(objetivo.fecha, true) + '</div></div>' +
+        '<div class="card"><div class="label">Señal WiFi</div><div class="value">' + (isFinite(objetivo.rssi) ? objetivo.rssi + ' dBm' : '—') + '</div><div class="meta">' + esc(objetivo.area) + '</div></div>';
+    }
+
+    function renderTabla(estado) {
+      const tbody = el('tablaEstado').querySelector('tbody');
+      if (!estado.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">Sin lecturas todavía. Espera a que un módulo envíe datos.</td></tr>';
+        return;
+      }
+      const filas = estado.slice().sort(function (a, b) { return (a.area + a.deviceId).localeCompare(b.area + b.deviceId); });
+      tbody.innerHTML = filas.map(function (s) {
+        return '<tr>' +
+          '<td><strong>' + esc(s.deviceId) + '</strong></td>' +
+          '<td>' + esc(s.area) + '</td>' +
+          '<td>' + (isFinite(s.temp) ? s.temp.toFixed(1) + ' °C' : '—') + '</td>' +
+          '<td>' + (isFinite(s.hum) ? s.hum.toFixed(1) + ' %' : '—') + '</td>' +
+          '<td>' + fmtFecha(s.fecha, true) + '</td>' +
+          '<td>' + (isFinite(s.rssi) ? s.rssi + ' dBm' : '—') + '</td>' +
+          '<td>' + badgeEstatus(s.fecha) + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    function cargarGrafica() {
+      const device = el('selDevice').value;
+      const horas = parseInt(el('selRango').value, 10);
+      const conFecha = horas > 24;
+      el('tituloGrafica').textContent = device ? ('Historial: ' + device) : 'Historial de lecturas';      google.script.run.withSuccessHandler(function (puntos) {
+        const labels = puntos.map(function (p) { return fmtFecha(p[0], conFecha); });
+        const temps = puntos.map(function (p) { return p[1]; });
+        const hums = puntos.map(function (p) { return p[2]; });
+        const datos = {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Temperatura (°C)',
+              data: temps,
+              borderColor: '#ff9f43',
+              backgroundColor: 'rgba(255,159,67,.12)',
+              fill: true,
+              tension: .35,
+              pointRadius: 0,
+              borderWidth: 2,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Humedad (%)',
+              data: hums,
+              borderColor: '#4da3ff',
+              backgroundColor: 'rgba(77,163,255,.10)',
+              fill: true,
+              tension: .35,
+              pointRadius: 0,
+              borderWidth: 2,
+              yAxisID: 'y1'
+            }
+          ]
+        };
+        const opciones = {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#8b98a9' } },
+            tooltip: {
+              callbacks: {
+                label: function (ctx) {
+                  const unidad = ctx.dataset.yAxisID === 'y1' ? ' %' : ' °C';
+                  return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + unidad;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#8b98a9', maxTicksLimit: 12, maxRotation: 0 },
+              grid: { color: 'rgba(42,51,66,.5)' }
+            },
+            y: {
+              position: 'left',
+              title: { display: true, text: '°C', color: '#ff9f43' },
+              ticks: { color: '#8b98a9' },
+              grid: { color: 'rgba(42,51,66,.5)' }
+            },
+            y1: {
+              position: 'right',
+              min: 0,
+              max: 100,
+              title: { display: true, text: '%', color: '#4da3ff' },
+              ticks: { color: '#8b98a9' },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        };
+        if (chart) chart.destroy();
+        chart = new Chart(el('chart'), { type: 'line', data: datos, options: opciones });
+      }).getHistorial(device, horas);
+    }
+
+    function cargarAdmin() {
+      google.script.run.withSuccessHandler(function (pend) {
+        const tbody = el('tablaPendientes').querySelector('tbody');
+        if (!pend.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin dispositivos pendientes.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = pend.map(function (p) {
+          return '<tr>' +
+            '<td><strong>' + esc(p.deviceId) + '</strong></td>' +
+            '<td>' + fmtFecha(p.primera, true) + '</td>' +
+            '<td>' + fmtFecha(p.ultima, true) + '</td>' +
+            '<td>' + p.veces + '</td>' +
+            '<td><button class="ghost" onclick="llenarRegistro(\'' + esc(p.deviceId) + '\')">Registrar</button></td>' +
+            '</tr>';
+        }).join('');
+      }).getPendientes();
+
+      google.script.run.withSuccessHandler(function (disp) {
+        cache.dispositivos = disp;
+        const tbody = el('tablaDispositivos').querySelector('tbody');
+        if (!disp.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin dispositivos registrados.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = disp.map(function (d) {
+          return '<tr>' +
+            '<td><strong>' + esc(d.deviceId) + '</strong></td>' +
+            '<td>' + esc(d.area) + '</td>' +
+            '<td>' + esc(d.nombre || '—') + '</td>' +
+            '<td>' + (d.activo ? '<span class="badge ok">Sí</span>' : '<span class="badge bad">No</span>') + '</td>' +
+            '<td><button class="' + (d.activo ? 'ghost' : '') + '" onclick="toggleActivo(\'' + esc(d.deviceId) + '\',' + d.activo + ')">' + (d.activo ? 'Desactivar' : 'Activar') + '</button></td>' +
+            '</tr>';
+        }).join('');
+      }).getDispositivos();
+    }
+
+    function llenarRegistro(id) {
+      el('inpId').value = id;
+      document.querySelector('details').open = true;
+      el('inpArea').focus();
+    }
+
+    function toggleActivo(id, activo) {
+      google.script.run
+        .withSuccessHandler(function () { cargarAdmin(); cargarEstado(); })
+        .withFailureHandler(function (err) { alert(err.message); })
+        .setDispositivoActivo(id, !activo);
+    }
+
+    function registrar() {
+      const id = el('inpId').value.trim();
+      const area = el('inpArea').value.trim();
+      const nombre = el('inpNombre').value.trim();
+      const tipo = el('inpTipo').value.trim();
+      if (!id || !area) {
+        el('msgRegistro').textContent = 'DeviceID y Área son obligatorios.';
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(function () {
+          el('msgRegistro').textContent = 'Dispositivo ' + id + ' registrado.';
+          el('inpId').value = el('inpArea').value = el('inpNombre').value = el('inpTipo').value = '';
+          cargarAdmin();
+          cargarFiltros();
+        })
+        .withFailureHandler(function (err) { el('msgRegistro').textContent = 'Error: ' + err.message; })
+        .registrarDispositivo(id, area, nombre, tipo);
+    }
+
+    function actualizarTodo() {
+      cargarGrafica();
+      cargarEstado();
+      cargarAdmin();
+      cargarFiltros();
+      google.script.run.withSuccessHandler(function (cfg) {
+        el('infoGral').textContent = 'Intervalo de envío: ' + cfg.intervalo + ' s · Ejecuciones hoy: ' + cfg.ejecucionesHoy +
+          ' · Última actualización: ' + new Date().toLocaleTimeString('es-MX');
+      }).getConfiguracion();
+    }
+
+    el('selArea').addEventListener('change', function () {
+      poblarSelectDispositivos();
+      cargarGrafica();
+      cargarEstado();
+    });
+    el('selDevice').addEventListener('change', function () { cargarGrafica(); cargarEstado(); });
+    el('selRango').addEventListener('change', cargarGrafica);
+    el('btnRefresh').addEventListener('click', actualizarTodo);
+    el('btnRegistrar').addEventListener('click', registrar);
+
+    actualizarTodo();
+    setInterval(actualizarTodo, 60000);
+  </script>
+</body>
+</html>

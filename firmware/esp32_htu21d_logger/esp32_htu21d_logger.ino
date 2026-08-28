@@ -1,26 +1,25 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <Wire.h>
-#include "Adafruit_HTU21DF.h"
+#include <DHT.h>
 
 // ==================== CONFIGURACIÓN POR MÓDULO ====================
-const char* DEVICE_ID  = "QX1";
+const char* DEVICE_ID  = "D02";
 const char* WIFI_SSID  = "HOSPITAL SAN DIEGO";
 const char* WIFI_PASS  = "SanDiego#23";
 const char* SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwCLYlBLa953tX1BhUVcqi49vX06riRtawxMGw2AXY7EkrWtT0VyW6oS7faQaPt6oLI/exec";
 const char* API_TOKEN  = "dbff22909f32453d8259c738e079ad1901638e2c48da480892d1bdf449912406";
 // ==================================================================
 
-#define PIN_SDA 22
-#define PIN_SCL 23
+#define DHT_PIN 2        // pin de DATOS del DHT22 (silk D2 = GPIO2 en la C3 mini)
+#define DHT_TYPE DHT22
 
-const unsigned long SENSOR_PERIOD_MS = 2000;
-const unsigned long SEND_INTERVAL_MS = 300000;   // 5 minutos
+const unsigned long SENSOR_PERIOD_MS = 3000;   // el DHT22 no admite lecturas más rápidas
+const unsigned long SEND_INTERVAL_MS = 300000; // 5 minutos
 const unsigned long WIFI_RETRY_MS   = 10000;
 const unsigned long MAX_OFFLINE_MS  = 900000;
 const int BUFFER_SIZE = 30;
 
-Adafruit_HTU21DF htu = Adafruit_HTU21DF();
+DHT dht(DHT_PIN, DHT_TYPE);
 
 struct Lectura { float temp; float hum; };
 Lectura buffer[BUFFER_SIZE];
@@ -32,49 +31,6 @@ unsigned long lastWifiTry = 0;
 unsigned long offlineSince = 0;
 unsigned long sendInterval = SEND_INTERVAL_MS;
 unsigned long retryDelay = 10000;
-
-struct Par { int sda; int scl; const char* nombre; };
-Par pares[] = {
-  {22, 23, "22/23 (C6: D4/D5)"},
-  {4, 5,   "4/5   (S3: D4/D5)"},
-  {8, 9,   "8/9   (S3: SDA/SCL)"},
-  {6, 7,   "6/7   (C3: D4/D5)"},
-  {21, 22, "21/22 (devboard clasico)"}
-};
-
-void escanearI2C() {
-  Serial.println("Dispositivos en el bus I2C por cada par de pines:");
-  for (int i = 0; i < 5; i++) {
-    Wire.end();
-    Wire.begin(pares[i].sda, pares[i].scl);
-    pinMode(pares[i].sda, INPUT_PULLUP);
-    pinMode(pares[i].scl, INPUT_PULLUP);
-    Serial.print("  SDA/SCL ");
-    Serial.print(pares[i].nombre);
-    Serial.print(": ");
-    int n = 0;
-    for (byte a = 1; a < 127; a++) {
-      Wire.beginTransmission(a);
-      if (Wire.endTransmission() == 0) {
-        Serial.print("0x");
-        if (a < 16) Serial.print("0");
-        Serial.print(a, HEX);
-        if (a == 0x40) Serial.print("(HTU21D)");
-        if (a == 0x38) Serial.print("(AHT20)");
-        if (a == 0x44) Serial.print("(SHT30)");
-        Serial.print(" ");
-        n++;
-      }
-    }
-    if (n == 0) Serial.print("nada");
-    Serial.println();
-    delay(200);
-  }
-  Wire.end();
-  Wire.begin(PIN_SDA, PIN_SCL);
-  Serial.println("Si aparece 0x40 en un par distinto a 22/23, usa esos numeros en PIN_SDA/PIN_SCL.");
-  Serial.println("Si no aparece nada: revisa VCC->3V3, GND y pull-ups de 4.7k.");
-}
 
 void conectarWifi() {
   Serial.print("Conectando a WiFi ");
@@ -173,17 +129,19 @@ void setup() {
   Serial.begin(115200);
   delay(1500);
   Serial.println();
-  Serial.println("XIAO ESP32-C6 + HTU21D -> Google Sheets");
+  Serial.println("ESP32-C3 mini + DHT22 -> Google Sheets");
   Serial.print("DeviceID: ");
   Serial.println(DEVICE_ID);
 
-  Wire.begin(PIN_SDA, PIN_SCL);
-  if (!htu.begin()) {
-    Serial.println("ERROR: No se detecta el sensor HTU21D.");
-    escanearI2C();
-    while (true) delay(1000);
+  dht.begin();
+  delay(2000);
+
+  float t = dht.readTemperature();
+  if (isnan(t)) {
+    Serial.println("ADVERTENCIA: primera lectura del DHT22 falló (es normal al inicio).");
+  } else {
+    Serial.println("DHT22 respondiendo.");
   }
-  Serial.println("HTU21D detectado.");
 
   conectarWifi();
   lastSend = millis();
@@ -210,7 +168,13 @@ void loop() {
 
   if (ahora - lastRead >= SENSOR_PERIOD_MS) {
     lastRead = ahora;
-    anadirLectura(htu.readTemperature(), htu.readHumidity());
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+    if (isnan(t) || isnan(h)) {
+      Serial.println("Lectura DHT22 fallida, se ignora.");
+    } else {
+      anadirLectura(t, h);
+    }
   }
 
   if (bufCount > 0 && ahora - lastSend >= sendInterval) {

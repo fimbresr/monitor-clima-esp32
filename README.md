@@ -1,8 +1,11 @@
 # Monitor de Clima — ESP32 + Google Sheets + Dashboard
 
-Sistema de monitoreo de temperatura y humedad: módulos XIAO ESP32-C6 con sensor HTU21D
+Sistema de monitoreo de temperatura y humedad: módulos ESP32 con sensores (HTU21D/DHT22)
 envían lecturas por WiFi a un backend de Google Apps Script, que las guarda en una hoja de
 Google Sheets ("datos esp32") y sirve un dashboard web con gráficas por área y dispositivo.
+
+**📚 Guía de operación:** para dar de alta cualquier módulo nuevo (firmware, registro en
+hoja, dashboard y solución de errores comunes) lee [GUIA_MODULOS.md](GUIA_MODULOS.md).
 
 ## Estructura
 
@@ -130,3 +133,6 @@ accesos: ejecuta `rotarToken` en el editor y actualiza el token en cada ESP32 y 
   como diagnóstico (`epoch`).
 - Historial grande: el dashboard lee como máximo las últimas 5000 filas; si la hoja crece
   mucho, archiva `HISTORIAL` por año manualmente.
+
+
+ token: 90484f2b35624865bfecb58ac7e7f01051d2078bd0d145a58df40f3fbc9e70ec

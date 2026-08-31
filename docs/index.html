@@ -222,13 +222,18 @@
   </dialog>
 
   <script>
-    const API_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbxD4kFxxi-j4xBpvIJ0LpkWudqVDFhHnWKSMi8y4SW3XjSJRlb93waVOeKOQjCnPW-j/exec';
+    const API_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbwQDe4JBvRlVziB4NYBNM3TCfOz7iee_FolnXv-PjopLHBgbB_BD8otgVkZtAjCcYfU/exec';
     let chart = null;
     const cache = { dispositivos: [], areas: [] };
 
     function el(id) { return document.getElementById(id); }
     function apiUrl() { return localStorage.getItem('apiUrl') || API_URL_DEFAULT; }
     function adminToken() { return localStorage.getItem('adminToken') || ''; }
+
+    function rssiValido(valor) {
+      const n = Number(valor);
+      return Number.isFinite(n) && n >= -120 && n <= 0 ? n : null;
+    }
 
     function esc(texto) {
       return String(texto == null ? '' : texto)
@@ -374,7 +379,7 @@
       cont.innerHTML =
         '<div class="card"><div class="label">Temperatura</div><div class="value" style="color:var(--temp)">' + (isFinite(objetivo.temp) ? objetivo.temp.toFixed(1) + ' °C' : '—') + '</div><div class="meta">' + esc(objetivo.deviceId) + '</div></div>' +
         '<div class="card"><div class="label">Humedad</div><div class="value" style="color:var(--hum)">' + (isFinite(objetivo.hum) ? objetivo.hum.toFixed(1) + ' %' : '—') + '</div><div class="meta">Última: ' + fmtFecha(objetivo.fecha, true) + '</div></div>' +
-        '<div class="card"><div class="label">Señal WiFi</div><div class="value">' + (isFinite(objetivo.rssi) ? objetivo.rssi + ' dBm' : '—') + '</div><div class="meta">' + esc(objetivo.area) + '</div></div>';
+        '<div class="card"><div class="label">Señal WiFi</div><div class="value">' + (rssiValido(objetivo.rssi) !== null ? rssiValido(objetivo.rssi) + ' dBm' : '—') + '</div><div class="meta">' + esc(objetivo.area) + '</div></div>';
     }
 
     function renderTabla(estado) {
@@ -391,7 +396,7 @@
           '<td>' + (isFinite(s.temp) ? s.temp.toFixed(1) + ' °C' : '—') + '</td>' +
           '<td>' + (isFinite(s.hum) ? s.hum.toFixed(1) + ' %' : '—') + '</td>' +
           '<td>' + fmtFecha(s.fecha, true) + '</td>' +
-          '<td>' + (isFinite(s.rssi) ? s.rssi + ' dBm' : '—') + '</td>' +
+          '<td>' + (rssiValido(s.rssi) !== null ? rssiValido(s.rssi) + ' dBm' : '—') + '</td>' +
           '<td>' + badgeEstatus(s.fecha) + '</td>' +
           '</tr>';
       }).join('');
@@ -408,6 +413,7 @@
         const labels = res.puntos.map(function (p) { return fmtFecha(p[0], conFecha); });
         const temps = res.puntos.map(function (p) { return p[1]; });
         const hums = res.puntos.map(function (p) { return p[2]; });
+        const ctx = el('chart').getContext('2d');
         const datos = {
           labels: labels,
           datasets: [
@@ -472,7 +478,6 @@
           }
         };
         if (chart) chart.destroy();
-        const ctx = el('chart').getContext('2d');
         datos.datasets[0].backgroundColor = hacerGradiente(ctx, 'rgba(255,159,67,.55)', 'rgba(255,159,67,0)');
         datos.datasets[1].backgroundColor = hacerGradiente(ctx, 'rgba(77,163,255,.50)', 'rgba(77,163,255,0)');
         chart = new Chart(ctx, { type: 'line', data: datos, options: opciones });
